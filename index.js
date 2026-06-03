@@ -40,36 +40,18 @@ function ensureToolbarButton(app) {
   button.title = "git viewer";
   button.hidden = app.dataset.route !== "workspace";
   button.setAttribute("aria-label", "toggle git viewer");
-  button.append(lucideIcon("git-graph"));
+  button.append(materialThemeIcon("git"));
   toolbar.insertBefore(button, toolbar.querySelector(".statusbtn"));
   return button;
 }
 
-function lucideIcon(name, size = 14) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", String(size));
-  svg.setAttribute("height", String(size));
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.75");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  svg.setAttribute("aria-hidden", "true");
-  if (name === "git-graph") {
-    svg.append(svgPath("M18 6V5a3 3 0 1 0-3 3"));
-    svg.append(svgPath("M6 18v1a3 3 0 1 0 3-3"));
-    svg.append(svgPath("M6 6v12"));
-    svg.append(svgPath("M18 6a3 3 0 1 0-3-3"));
-    svg.append(svgPath("M18 6v6a3 3 0 0 1-3 3H9"));
-  }
-  return svg;
-}
-
-function svgPath(d) {
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("d", d);
-  return path;
+function materialThemeIcon(name, size = 16) {
+  const img = document.createElement("img");
+  img.alt = "";
+  img.width = size;
+  img.height = size;
+  img.src = `/node_modules/material-icon-theme/icons/${name}.svg`;
+  return img;
 }
 
 function syncToolbarButton(app) {
@@ -98,7 +80,7 @@ function createHeader() {
   tabs.className = "tree-tabs";
   const title = document.createElement("span");
   title.className = "tree-tab on";
-  title.append(lucideIcon("git-graph", 12), document.createTextNode(" git"));
+  title.append(materialThemeIcon("git", 14), document.createTextNode(" git"));
   tabs.append(title);
   const actions = document.createElement("span");
   actions.className = "tree-head-actions";
