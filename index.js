@@ -3,24 +3,36 @@ const PAGE_SIZE = 30;
 const MAX_LIMIT = 180;
 
 export default function activate(context) {
-  ensureToolbarButton(context.app);
-  const panel = ensurePanel(context.app);
+  const sidebar = ensureSidebar(context.app);
+  const panel = ensurePanel(sidebar);
+  const button = ensureToolbarButton(context.app);
   const state = { commits: [], limit: PAGE_SIZE, hasMore: false, selectedHash: "" };
 
-  panel.addEventListener("click", (event) => {
+  if (button) {
+    button.onclick = (event) => {
+      event.preventDefault();
+      toggleSidebar(context, state, sidebar, panel);
+    };
+  }
+
+  sidebar.addEventListener("click", (event) => {
     const target = event.target.closest("[data-git-viewer-action]");
-    if (!target || !panel.contains(target)) return;
+    if (!target || !sidebar.contains(target)) return;
     event.preventDefault();
-    handleAction(context, state, panel, target);
+    handleAction(context, state, sidebar, panel, target);
   });
 
-  window.addEventListener("pi-plugin-sidebar:open", (event) => {
+  document.addEventListener("pointerdown", (event) => {
+    if (!isSidebarOpen(sidebar)) return;
+    if (sidebar.contains(event.target) || button?.contains(event.target)) return;
+    setSidebarOpen(context.app, sidebar, false);
+  });
+
+  window.addEventListener("pi-workspace:active", () => {
     syncToolbarButton(context.app);
-    if (event.detail?.panel === PANEL_ID) refresh(context, state, panel, PAGE_SIZE);
+    if (isSidebarOpen(sidebar)) refresh(context, state, panel, PAGE_SIZE);
   });
-  window.addEventListener("pi-workspace:active", () => refresh(context, state, panel, PAGE_SIZE));
 
-  context.app.syncPluginSidebarPanels?.();
   syncToolbarButton(context.app);
   refresh(context, state, panel, PAGE_SIZE);
 }
@@ -29,13 +41,17 @@ function ensureToolbarButton(app) {
   const toolbar = app.querySelector("[data-plugin-toolbar]") || app.querySelector(".topbar .actions");
   if (!toolbar) return undefined;
   const existing = toolbar.querySelector(`[data-plugin-toolbar-button="${PANEL_ID}"]`);
-  if (existing) return existing;
+  if (existing) {
+    delete existing.dataset.action;
+    delete existing.dataset.pluginPanel;
+    existing.dataset.gitViewerAction = "toggle-sidebar";
+    return existing;
+  }
 
   const button = document.createElement("button");
   button.type = "button";
   button.className = "iconbtn workspace-explorer-btn";
-  button.dataset.action = "toggle-plugin-sidebar";
-  button.dataset.pluginPanel = PANEL_ID;
+  button.dataset.gitViewerAction = "toggle-sidebar";
   button.dataset.pluginToolbarButton = PANEL_ID;
   button.title = "git viewer";
   button.hidden = app.dataset.route !== "workspace";
@@ -56,12 +72,41 @@ function materialThemeIcon(name, size = 16) {
 
 function syncToolbarButton(app) {
   const button = app.querySelector(`[data-plugin-toolbar-button="${PANEL_ID}"]`);
-  const sidebar = app.querySelector("[data-plugin-sidebar]");
-  button?.classList.toggle("on", app.dataset.tree === "on" && sidebar?.dataset.activePluginPanel === PANEL_ID);
+  const sidebar = app.querySelector("[data-git-viewer-sidebar]");
+  button?.classList.toggle("on", isSidebarOpen(sidebar));
+  if (button) button.hidden = app.dataset.route !== "workspace";
+  if (sidebar) sidebar.hidden = app.dataset.route !== "workspace";
 }
 
-function ensurePanel(app) {
-  const sidebar = app.querySelector("[data-plugin-sidebar]");
+function isSidebarOpen(sidebar) {
+  return sidebar?.dataset.open === "true";
+}
+
+function toggleSidebar(context, state, sidebar, panel) {
+  setSidebarOpen(context.app, sidebar, !isSidebarOpen(sidebar));
+  if (isSidebarOpen(sidebar)) refresh(context, state, panel, PAGE_SIZE);
+}
+
+function setSidebarOpen(app, sidebar, open) {
+  sidebar.dataset.open = String(open);
+  sidebar.setAttribute("aria-hidden", open ? "false" : "true");
+  syncToolbarButton(app);
+}
+
+function ensureSidebar(app) {
+  let sidebar = app.querySelector("[data-git-viewer-sidebar]");
+  if (sidebar) return sidebar;
+
+  sidebar = document.createElement("aside");
+  sidebar.className = "pi-git-viewer-sidebar";
+  sidebar.dataset.gitViewerSidebar = "";
+  sidebar.dataset.open = "false";
+  sidebar.setAttribute("aria-hidden", "true");
+  app.append(sidebar);
+  return sidebar;
+}
+
+function ensurePanel(sidebar) {
   let panel = sidebar.querySelector(`[data-plugin-panel="${PANEL_ID}"]`);
   if (panel) return panel;
 
@@ -76,7 +121,10 @@ function ensurePanel(app) {
 function createStyle() {
   const style = document.createElement("style");
   style.textContent = [
-    ".pi-git-viewer-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }",
+    ".pi-git-viewer-sidebar { position: fixed; z-index: 40; top: var(--topbar-height, 40px); right: 0; bottom: 0; width: min(520px, 90vw); background: var(--bg, #101114); color: var(--fg, inherit); border-left: 1px solid var(--border, rgba(255,255,255,.12)); box-shadow: -16px 0 32px rgba(0,0,0,.28); transform: translateX(100%); transition: transform .16s ease; display: flex; min-height: 0; }",
+    ".pi-git-viewer-sidebar[data-open=\"true\"] { transform: translateX(0); }",
+    ".pi-git-viewer-sidebar[hidden] { display: none; }",
+    ".pi-git-viewer-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; }",
     ".pi-git-viewer-panel .git-panel { flex: 1 1 auto; min-height: 0; overflow: hidden; }",
     ".pi-git-viewer-panel .git-history-grid { height: 100%; min-height: 0; }",
     ".pi-git-viewer-panel .git-commit-scroll { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }",
@@ -100,7 +148,7 @@ function createHeader() {
   status.className = "branch";
   status.dataset.gitViewerStatus = "";
   status.textContent = "—";
-  actions.append(status, actionButton("refresh", "↻", "refresh git"));
+  actions.append(status, actionButton("close-sidebar", "×", "close git viewer"), actionButton("refresh", "↻", "refresh git"));
   header.append(tabs, actions);
   return header;
 }
@@ -208,8 +256,9 @@ function statNode(className, text) {
   return node;
 }
 
-function handleAction(context, state, panel, target) {
+function handleAction(context, state, sidebar, panel, target) {
   const action = target.dataset.gitViewerAction;
+  if (action === "close-sidebar") return setSidebarOpen(context.app, sidebar, false);
   if (action === "refresh") return refresh(context, state, panel, PAGE_SIZE);
   if (action === "load-more") return refresh(context, state, panel, Math.min(state.limit + PAGE_SIZE, MAX_LIMIT));
   if (action === "select") return selectCommit(context, state, panel, target.dataset.hash || "");
