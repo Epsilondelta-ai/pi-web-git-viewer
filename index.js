@@ -68,9 +68,21 @@ function ensurePanel(app) {
   panel = document.createElement("section");
   panel.dataset.pluginPanel = PANEL_ID;
   panel.className = "pi-git-viewer-panel";
-  panel.append(createHeader(), createBody());
+  panel.append(createStyle(), createHeader(), createBody());
   sidebar.append(panel);
   return panel;
+}
+
+function createStyle() {
+  const style = document.createElement("style");
+  style.textContent = [
+    ".pi-git-viewer-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }",
+    ".pi-git-viewer-panel .git-panel { flex: 1 1 auto; min-height: 0; overflow: hidden; }",
+    ".pi-git-viewer-panel .git-history-grid { height: 100%; min-height: 0; }",
+    ".pi-git-viewer-panel .git-commit-scroll { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }",
+    ".pi-git-viewer-panel .git-detail { min-height: 0; overflow: auto; }",
+  ].join("\n");
+  return style;
 }
 
 function createHeader() {
