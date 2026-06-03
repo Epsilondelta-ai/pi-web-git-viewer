@@ -1,6 +1,7 @@
 {
   "id": "pi-web-git-viewer",
   "name": "Git Viewer",
-  "version": "0.1.1",
-  "entry": "index.js"
+  "version": "0.2.0",
+  "entry": "index.js",
+  "backend": "backend.js"
 }

@@ -84,11 +84,8 @@ async function refresh(context, state, panel, limit = state.limit) {
   state.limit = limit;
   setBody(panel, '<div class="git-empty">loading git history…</div>');
   try {
-    const [status, history] = await Promise.all([
-      context.api.get(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/status`).catch(() => undefined),
-      context.api.get(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/history?limit=${encodeURIComponent(limit)}`),
-    ]);
-    if (status) renderStatus(context.app, panel, status);
+    const history = await context.backend("history", { workspaceId, data: { limit } });
+    if (history.status) renderStatus(context.app, panel, history.status);
     state.commits = history.commits || [];
     state.hasMore = state.commits.length >= limit && limit < MAX_LIMIT;
     renderHistory(context, state, panel);
@@ -149,7 +146,7 @@ async function selectCommit(context, state, panel, hash) {
   detail.innerHTML = '<div class="git-empty">loading commit…</div>';
   grid.append(detail);
   try {
-    const result = await context.api.get(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/commit?hash=${encodeURIComponent(hash)}`);
+    const result = await context.backend("commit", { workspaceId, data: { hash } });
     detail.innerHTML = detailTemplate(result);
   } catch (error) {
     detail.innerHTML = `<div class="git-empty err">${escapeHtml(error.message || "commit unavailable")}</div>`;
