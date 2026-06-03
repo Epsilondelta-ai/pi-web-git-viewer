@@ -2,11 +2,6 @@ const PANEL_ID = "git-viewer";
 const PAGE_SIZE = 30;
 const MAX_LIMIT = 180;
 
-const icons = {
-  git: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v9"/><path d="M8.6 7.4 15.4 16.6"/></svg>',
-  refresh: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',
-};
-
 export default function activate(context) {
   ensureToolbarButton(context.app);
   const panel = ensurePanel(context.app);
@@ -45,7 +40,7 @@ function ensureToolbarButton(app) {
   button.title = "git viewer";
   button.hidden = app.dataset.route !== "workspace";
   button.setAttribute("aria-label", "toggle git viewer");
-  button.innerHTML = icons.git;
+  button.textContent = "⑂";
   toolbar.insertBefore(button, toolbar.querySelector(".statusbtn"));
   return button;
 }
@@ -64,25 +59,58 @@ function ensurePanel(app) {
   panel = document.createElement("section");
   panel.dataset.pluginPanel = PANEL_ID;
   panel.className = "pi-git-viewer-panel";
-  panel.innerHTML = `
-    <div class="tree-head">
-      <span class="tree-tabs"><span class="tree-tab on">${icons.git} git</span></span>
-      <span class="tree-head-actions"><span class="branch" data-git-viewer-status>—</span><button type="button" data-git-viewer-action="refresh" aria-label="refresh git" title="refresh git">${icons.refresh}</button></span>
-    </div>
-    <div class="git-panel" data-git-viewer-body><div class="git-empty">git history loads when opened</div></div>`;
+  panel.append(createHeader(), createBody());
   sidebar.append(panel);
   return panel;
+}
+
+function createHeader() {
+  const header = document.createElement("div");
+  header.className = "tree-head";
+  const tabs = document.createElement("span");
+  tabs.className = "tree-tabs";
+  const title = document.createElement("span");
+  title.className = "tree-tab on";
+  title.textContent = "⑂ git";
+  tabs.append(title);
+  const actions = document.createElement("span");
+  actions.className = "tree-head-actions";
+  const status = document.createElement("span");
+  status.className = "branch";
+  status.dataset.gitViewerStatus = "";
+  status.textContent = "—";
+  actions.append(status, actionButton("refresh", "↻", "refresh git"));
+  header.append(tabs, actions);
+  return header;
+}
+
+function createBody() {
+  const body = document.createElement("div");
+  body.className = "git-panel";
+  body.dataset.gitViewerBody = "";
+  body.append(emptyNode("git history loads when opened"));
+  return body;
+}
+
+function actionButton(action, label, title) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.gitViewerAction = action;
+  button.title = title;
+  button.setAttribute("aria-label", title);
+  button.textContent = label;
+  return button;
 }
 
 async function refresh(context, state, panel, limit = state.limit) {
   const workspaceId = context.app.dataset.activeWorkspaceId;
   if (!workspaceId) {
-    setBody(panel, '<div class="git-empty">open a workspace first</div>');
+    setBody(panel, [emptyNode("open a workspace first")]);
     return;
   }
 
   state.limit = limit;
-  setBody(panel, '<div class="git-empty">loading git history…</div>');
+  setBody(panel, [emptyNode("loading git history…")]);
   try {
     const history = await context.backend("history", { workspaceId, data: { limit } });
     if (history.status) renderStatus(context.app, panel, history.status);
@@ -90,7 +118,9 @@ async function refresh(context, state, panel, limit = state.limit) {
     state.hasMore = state.commits.length >= limit && limit < MAX_LIMIT;
     renderHistory(context, state, panel);
   } catch (error) {
-    setBody(panel, `<div class="git-empty err">${escapeHtml(error.message || "git history unavailable")}</div>`);
+    const node = emptyNode(error.message || "git history unavailable");
+    node.classList.add("err");
+    setBody(panel, [node]);
   }
 }
 
@@ -103,23 +133,58 @@ function renderStatus(app, panel, status) {
 
 function renderHistory(context, state, panel) {
   if (state.commits.length === 0) {
-    setBody(panel, '<div class="git-empty">no commits found</div>');
+    setBody(panel, [emptyNode("no commits found")]);
     return;
   }
 
-  setBody(panel, [
-    '<div class="git-history-grid" data-git-history-grid>',
-    '<div class="git-history-toolbar">',
-    `<button type="button" data-git-viewer-action="load-more" ${state.hasMore ? "" : "disabled"}>load 30 more</button>`,
-    '</div><div class="git-commit-scroll"><div class="git-commit-list">',
-    state.commits.map((commit) => commitRow(commit, state.selectedHash)).join(""),
-    '</div></div></div>',
-  ].join(""));
+  const grid = document.createElement("div");
+  grid.className = "git-history-grid";
+  grid.dataset.gitHistoryGrid = "";
+  const toolbar = document.createElement("div");
+  toolbar.className = "git-history-toolbar";
+  const loadMore = actionButton("load-more", "load 30 more", "load 30 more");
+  loadMore.disabled = !state.hasMore;
+  toolbar.append(loadMore);
+  const scroll = document.createElement("div");
+  scroll.className = "git-commit-scroll";
+  const list = document.createElement("div");
+  list.className = "git-commit-list";
+  list.append(...state.commits.map((commit) => commitRow(commit, state.selectedHash)));
+  scroll.append(list);
+  grid.append(toolbar, scroll);
+  setBody(panel, [grid]);
 }
 
 function commitRow(commit, selectedHash) {
   const hash = commit.hash || commit.shortHash || "";
-  return `<button type="button" class="git-commit-row ${selectedHash === hash ? "selected" : ""}" data-git-viewer-action="select" data-hash="${escapeHtml(hash)}"><span class="git-commit-main"><span class="git-subject">${escapeHtml(commit.subject || commit.shortHash || hash)}</span><span class="git-meta"><code>${escapeHtml(commit.shortHash || hash.slice(0, 7))}</code> · ${escapeHtml(commit.authorName || "unknown")} · ${formatDate(commit.date)}</span><span class="git-stats"><span class="add">+${commit.additions || 0}</span><span class="del">-${commit.deletions || 0}</span><span>${(commit.files || []).length} files</span></span></span></button>`;
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = ["git-commit-row", selectedHash === hash ? "selected" : ""].filter(Boolean).join(" ");
+  row.dataset.gitViewerAction = "select";
+  row.dataset.hash = hash;
+  const main = document.createElement("span");
+  main.className = "git-commit-main";
+  const subject = document.createElement("span");
+  subject.className = "git-subject";
+  subject.textContent = commit.subject || commit.shortHash || hash;
+  const meta = document.createElement("span");
+  meta.className = "git-meta";
+  const code = document.createElement("code");
+  code.textContent = commit.shortHash || hash.slice(0, 7);
+  meta.append(code, document.createTextNode(` · ${commit.authorName || "unknown"} · ${formatDate(commit.date)}`));
+  const stats = document.createElement("span");
+  stats.className = "git-stats";
+  stats.append(statNode("add", `+${commit.additions || 0}`), statNode("del", `-${commit.deletions || 0}`), statNode("", `${(commit.files || []).length} files`));
+  main.append(subject, meta, stats);
+  row.append(main);
+  return row;
+}
+
+function statNode(className, text) {
+  const node = document.createElement("span");
+  if (className) node.className = className;
+  node.textContent = text;
+  return node;
 }
 
 function handleAction(context, state, panel, target) {
@@ -143,47 +208,80 @@ async function selectCommit(context, state, panel, hash) {
   grid.classList.add("detail-open");
   const detail = document.createElement("div");
   detail.className = "git-detail";
-  detail.innerHTML = '<div class="git-empty">loading commit…</div>';
+  detail.append(emptyNode("loading commit…"));
   grid.append(detail);
   try {
     const result = await context.backend("commit", { workspaceId, data: { hash } });
-    detail.innerHTML = detailTemplate(result);
+    detail.replaceChildren(...detailNodes(result));
   } catch (error) {
-    detail.innerHTML = `<div class="git-empty err">${escapeHtml(error.message || "commit unavailable")}</div>`;
+    const node = emptyNode(error.message || "commit unavailable");
+    node.classList.add("err");
+    detail.replaceChildren(node);
   }
 }
 
-function detailTemplate(result) {
+function detailNodes(result) {
   const commit = result.commit || {};
   const files = commit.files || [];
-  return [
-    '<div class="git-detail-head">',
-    '<button type="button" class="git-detail-close" data-git-viewer-action="close-detail" aria-label="close commit details">×</button>',
-    `<strong>${escapeHtml(commit.subject || commit.shortHash || "commit")}</strong>`,
-    `<small>${escapeHtml(commit.shortHash || "")} · ${escapeHtml(commit.authorName || "unknown")} · ${formatDate(commit.date)}</small>`,
-    '</div>',
-    `<div class="git-file-list">${files.map(fileTemplate).join("") || '<span class="git-empty-inline">no file stats</span>'}</div>`,
-    `<pre class="git-message">${escapeHtml(result.body || commit.subject || "")}</pre>`,
-    result.truncated ? '<div class="git-truncated">diff truncated for performance</div>' : "",
-    `<pre class="git-diff">${escapeHtml(result.diff || "no diff")}</pre>`,
-  ].join("");
+  const head = document.createElement("div");
+  head.className = "git-detail-head";
+  const close = actionButton("close-detail", "×", "close commit details");
+  close.className = "git-detail-close";
+  const subject = document.createElement("strong");
+  subject.textContent = commit.subject || commit.shortHash || "commit";
+  const meta = document.createElement("small");
+  meta.textContent = `${commit.shortHash || ""} · ${commit.authorName || "unknown"} · ${formatDate(commit.date)}`;
+  head.append(close, subject, meta);
+  const fileList = document.createElement("div");
+  fileList.className = "git-file-list";
+  if (files.length) fileList.append(...files.map(fileNode));
+  else fileList.append(statNode("git-empty-inline", "no file stats"));
+  const message = document.createElement("pre");
+  message.className = "git-message";
+  message.textContent = result.body || commit.subject || "";
+  const nodes = [head, fileList, message];
+  if (result.truncated) nodes.push(statNode("git-truncated", "diff truncated for performance"));
+  const diff = document.createElement("pre");
+  diff.className = "git-diff";
+  diff.textContent = result.diff || "no diff";
+  nodes.push(diff);
+  return nodes;
 }
 
-function fileTemplate(file) {
-  const oldPath = file.oldPath ? `<small>${escapeHtml(file.oldPath)} →</small>` : "";
-  return `<div class="git-file"><span class="status ${escapeHtml(file.status || "modified")}">${escapeHtml(file.status || "modified")}</span><span class="path">${oldPath}${escapeHtml(file.path || "")}</span><span class="nums"><span class="add">+${file.additions || 0}</span><span class="del">-${file.deletions || 0}</span></span></div>`;
+function fileNode(file) {
+  const row = document.createElement("div");
+  row.className = "git-file";
+  const status = document.createElement("span");
+  status.className = `status ${file.status || "modified"}`;
+  status.textContent = file.status || "modified";
+  const path = document.createElement("span");
+  path.className = "path";
+  if (file.oldPath) {
+    const old = document.createElement("small");
+    old.textContent = `${file.oldPath} →`;
+    path.append(old);
+  }
+  path.append(document.createTextNode(file.path || ""));
+  const nums = document.createElement("span");
+  nums.className = "nums";
+  nums.append(statNode("add", `+${file.additions || 0}`), statNode("del", `-${file.deletions || 0}`));
+  row.append(status, path, nums);
+  return row;
 }
 
-function setBody(panel, html) {
-  panel.querySelector("[data-git-viewer-body]").innerHTML = html;
+function setBody(panel, nodes) {
+  panel.querySelector("[data-git-viewer-body]").replaceChildren(...nodes);
+}
+
+function emptyNode(message) {
+  const node = document.createElement("div");
+  node.className = "git-empty";
+  node.textContent = message;
+  return node;
 }
 
 function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown date";
   return date.toLocaleString(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
 }
