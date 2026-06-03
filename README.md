@@ -1,0 +1,12 @@
+# pi-web-git-viewer
+
+Git history sidebar plugin for pi-web.
+
+## Install
+
+```sh
+pi-web
+# Settings → Plugins → local path → ../pi-web-git-viewer → install
+```
+
+Provides a separate git-viewer panel button target (`git-viewer`).
