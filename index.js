@@ -66,8 +66,20 @@ function materialThemeIcon(name, size = 16) {
   img.alt = "";
   img.width = size;
   img.height = size;
-  img.src = `/node_modules/material-icon-theme/icons/${name}.svg`;
+  img.src = materialIconDataUrl(name);
   return img;
+}
+
+function materialIconDataUrl(name) {
+  const svg = materialIconSvg(name);
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function materialIconSvg(name) {
+  const color = name === "git" ? "#f05032" : "#90a4ae";
+  const branch =
+    "M6 4.2a1.8 1.8 0 1 0-1 1.62v6.36a1.8 1.8 0 1 0 1.3-.02V9.9c2.05-.2 3.7-1.7 4.08-3.65a1.8 1.8 0 1 0-1.32-.3C8.8 7.33 7.67 8.4 6.3 8.58V5.82A1.8 1.8 0 0 0 6 4.2Z";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><rect x="2.6" y="2.6" width="12.8" height="12.8" rx="3" fill="${color}" transform="rotate(45 9 9)"/><path d="${branch}" fill="rgba(255,255,255,.92)"/></svg>`;
 }
 
 function syncToolbarButton(app) {
