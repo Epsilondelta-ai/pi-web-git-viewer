@@ -1,6 +1,9 @@
 const PANEL_ID = "git-viewer";
 const PAGE_SIZE = 30;
 const MAX_LIMIT = 180;
+const MATERIAL_GIT_ICON_FALLBACK =
+  "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20height%3D%2224%22%20viewBox%3D%220%20-960%20960%20960%22%20width%3D%2224%22%20fill%3D%22%23f05032%22%3E%3Cpath%20d%3D%22M600-120v-120H440v-400h-80v120H80v-320h280v120h240v-120h280v320H600v-120h-80v320h80v-120h280v320H600ZM160-600h120v-160H160v160Zm520%20400h120v-160H680v160Zm0-400h120v-160H680v160ZM160-600v-160%20160Zm520%20400v-160%20160Zm0-400v-160%20160Z%22%2F%3E%3C%2Fsvg%3E";
+const MATERIAL_GIT_ICON_URL = resolveMaterialGitIconUrl();
 
 export default function activate(context) {
   const sidebar = ensureSidebar(context.app);
@@ -56,30 +59,30 @@ function ensureToolbarButton(app) {
   button.title = "git viewer";
   button.hidden = app.dataset.route !== "workspace";
   button.setAttribute("aria-label", "toggle git viewer");
-  button.append(materialThemeIcon("git"));
+  button.append(materialIcon(16));
   toolbar.insertBefore(button, toolbar.querySelector(".statusbtn"));
   return button;
 }
 
-function materialThemeIcon(name, size = 16) {
+function resolveMaterialGitIconUrl() {
+  try {
+    return new URL("./assets/material-account-tree.svg", import.meta.url).href;
+  } catch {
+    return MATERIAL_GIT_ICON_FALLBACK;
+  }
+}
+
+function materialIcon(size = 16) {
   const img = document.createElement("img");
   img.alt = "";
   img.width = size;
   img.height = size;
-  img.src = materialIconDataUrl(name);
+  img.src = MATERIAL_GIT_ICON_URL;
+  img.onerror = () => {
+    img.onerror = null;
+    img.src = MATERIAL_GIT_ICON_FALLBACK;
+  };
   return img;
-}
-
-function materialIconDataUrl(name) {
-  const svg = materialIconSvg(name);
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-function materialIconSvg(name) {
-  const color = name === "git" ? "#f05032" : "#90a4ae";
-  const branch =
-    "M6 4.2a1.8 1.8 0 1 0-1 1.62v6.36a1.8 1.8 0 1 0 1.3-.02V9.9c2.05-.2 3.7-1.7 4.08-3.65a1.8 1.8 0 1 0-1.32-.3C8.8 7.33 7.67 8.4 6.3 8.58V5.82A1.8 1.8 0 0 0 6 4.2Z";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><rect x="2.6" y="2.6" width="12.8" height="12.8" rx="3" fill="${color}" transform="rotate(45 9 9)"/><path d="${branch}" fill="rgba(255,255,255,.92)"/></svg>`;
 }
 
 function syncToolbarButton(app) {
@@ -160,7 +163,7 @@ function createHeader() {
   tabs.className = "tree-tabs";
   const title = document.createElement("span");
   title.className = "tree-tab on";
-  title.append(materialThemeIcon("git", 14), document.createTextNode(" git"));
+  title.append(materialIcon(14), document.createTextNode(" git"));
   tabs.append(title);
   const actions = document.createElement("span");
   actions.className = "tree-head-actions";

@@ -11,6 +11,10 @@ pi-web
 
 Provides a separate git-viewer panel button target (`git-viewer`).
 
+## Icons
+
+Uses a vendored Material Symbols `account_tree` SVG at `assets/material-account-tree.svg`; no icon package or runtime font dependency is required.
+
 ## Backend
 
 Uses prebuilt Go backend binaries under `bin/`:
