@@ -70,19 +70,42 @@ export default function activate(context: PluginContext): () => void {
 
   window.addEventListener("pi-workspace:active", onWorkspaceActive);
 
+  let initialRefreshDone: boolean = false;
+  const refreshInitialWorkspace = (): void => {
+    if (initialRefreshDone) {
+      return;
+    }
+
+    initialRefreshDone = true;
+    void refresh(context, state, panel, PAGE_SIZE);
+  };
+  const onSidebarBridgeReady = (): void => {
+    window.clearTimeout(bridgeFallbackTimer);
+    refreshInitialWorkspace();
+  };
   const bridgeProbe: number = window.setInterval((): void => {
     if (bindSidebarBridge(context, state, panel)) {
       window.clearInterval(bridgeProbe);
+      onSidebarBridgeReady();
     }
   }, 250);
-  const bridgeProbeStop: number = window.setTimeout((): void => window.clearInterval(bridgeProbe), 5000);
+  const bridgeFallbackTimer: number = window.setTimeout((): void => {
+    if (!initialRefreshDone) {
+      refreshInitialWorkspace();
+    }
+  }, 5000);
+  const bridgeProbeStop: number = window.setTimeout((): void => window.clearInterval(bridgeProbe), 30000);
 
-  bindSidebarBridge(context, state, panel);
+  if (bindSidebarBridge(context, state, panel)) {
+    window.clearInterval(bridgeProbe);
+    onSidebarBridgeReady();
+  }
+
   syncToolbarButton(context.app);
-  void refresh(context, state, panel, PAGE_SIZE);
 
   return (): void => {
     window.clearInterval(bridgeProbe);
+    window.clearTimeout(bridgeFallbackTimer);
     window.clearTimeout(bridgeProbeStop);
     state.sidebarSubscription?.unsubscribe();
     button?.removeEventListener("click", onButtonClick);

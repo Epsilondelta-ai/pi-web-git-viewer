@@ -6,7 +6,7 @@
   "scripts": {
     "build": "bun build src/index.ts --outdir . --target browser --format esm --sourcemap=none --minify --entry-naming \"index.js\" --asset-naming \"assets/[name].[ext]\"",
     "typecheck": "tsc --noEmit",
-    "check": "bun run build && bun run typecheck"
+    "check": "bun install --frozen-lockfile && bun run build && bun run typecheck"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
