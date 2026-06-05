@@ -70,18 +70,23 @@ export default function activate(context: PluginContext): () => void {
 
   window.addEventListener("pi-workspace:active", onWorkspaceActive);
 
-  let initialRefreshDone: boolean = false;
-  const refreshInitialWorkspace = (): void => {
-    if (initialRefreshDone) {
+  let initialRefreshSource: "bridge" | "fallback" | "none" = "none";
+  let initialRefreshWorkspaceId: string = "";
+  const refreshInitialWorkspace = (source: "bridge" | "fallback", force: boolean = false): void => {
+    if (initialRefreshSource !== "none" && !force) {
       return;
     }
 
-    initialRefreshDone = true;
+    initialRefreshSource = source;
+    initialRefreshWorkspaceId = getActiveWorkspaceId(context.app);
     void refresh(context, state, panel, PAGE_SIZE);
   };
   const onSidebarBridgeReady = (): void => {
-    window.clearTimeout(bridgeFallbackTimer);
-    refreshInitialWorkspace();
+    const bridgeWorkspaceId: string = getActiveWorkspaceId(context.app);
+    const shouldRefreshFromBridge: boolean =
+      initialRefreshSource === "none" ||
+      (initialRefreshSource === "fallback" && initialRefreshWorkspaceId !== bridgeWorkspaceId);
+    refreshInitialWorkspace("bridge", shouldRefreshFromBridge);
   };
   const bridgeProbe: number = window.setInterval((): void => {
     if (bindSidebarBridge(context, state, panel)) {
@@ -89,23 +94,19 @@ export default function activate(context: PluginContext): () => void {
       onSidebarBridgeReady();
     }
   }, 250);
-  const bridgeFallbackTimer: number = window.setTimeout((): void => {
-    if (!initialRefreshDone) {
-      refreshInitialWorkspace();
-    }
-  }, 5000);
   const bridgeProbeStop: number = window.setTimeout((): void => window.clearInterval(bridgeProbe), 30000);
 
   if (bindSidebarBridge(context, state, panel)) {
     window.clearInterval(bridgeProbe);
     onSidebarBridgeReady();
+  } else {
+    refreshInitialWorkspace("fallback");
   }
 
   syncToolbarButton(context.app);
 
   return (): void => {
     window.clearInterval(bridgeProbe);
-    window.clearTimeout(bridgeFallbackTimer);
     window.clearTimeout(bridgeProbeStop);
     state.sidebarSubscription?.unsubscribe();
     button?.removeEventListener("click", onButtonClick);

@@ -5,18 +5,28 @@ import { refresh } from "./history";
 export function bindSidebarBridge(context: PluginContext, state: GitViewerState, panel: HTMLElement): boolean {
   const sidebarApi: SidebarApi | undefined = context.app.piWebSidebar;
 
-  if (!sidebarApi || state.sidebarSubscriptionSource === sidebarApi) {
-    return !!sidebarApi;
+  if (!sidebarApi) {
+    return false;
   }
 
-  state.sidebarSubscription?.unsubscribe();
-  state.sidebarSubscriptionSource = sidebarApi;
+  const hasSnapshot: boolean = typeof sidebarApi.getSnapshot === "function";
+  const hasState: boolean = typeof sidebarApi.state$?.subscribe === "function";
 
-  if (typeof sidebarApi.getSnapshot === "function") {
+  if (!hasSnapshot && !hasState) {
+    return false;
+  }
+
+  if (state.sidebarSubscriptionSource !== sidebarApi) {
+    state.sidebarSubscription?.unsubscribe();
+    state.sidebarSubscription = undefined;
+    state.sidebarSubscriptionSource = sidebarApi;
+  }
+
+  if (hasSnapshot && sidebarApi.getSnapshot) {
     syncWorkspace(context, state, panel, sidebarApi.getSnapshot().activeWorkspaceId);
   }
 
-  if (sidebarApi.state$ && typeof sidebarApi.state$.subscribe === "function") {
+  if (!state.sidebarSubscription && hasState && sidebarApi.state$) {
     state.sidebarSubscription = sidebarApi.state$.subscribe((snapshot: SidebarSnapshot): void => {
       syncWorkspace(context, state, panel, snapshot.activeWorkspaceId);
     });
