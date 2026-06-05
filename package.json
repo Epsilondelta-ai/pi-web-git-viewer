@@ -1,0 +1,9 @@
+{
+  "name": "pi-web-git-viewer",
+  "version": "0.3.6",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.js --outdir . --target browser --format esm --sourcemap=none --minify --entry-naming \"[name].[ext]\" --asset-naming \"assets/[name].[ext]\""
+  }
+}
