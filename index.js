@@ -90,6 +90,7 @@ function toggleSidebar(context, state, sidebar, panel) {
 function setSidebarOpen(app, sidebar, open) {
   sidebar.dataset.open = String(open);
   sidebar.setAttribute("aria-hidden", open ? "false" : "true");
+  sidebar.style.transform = open ? "translateX(0)" : "translateX(100%)";
   syncToolbarButton(app);
 }
 
@@ -102,8 +103,15 @@ function ensureSidebar(app) {
   sidebar.dataset.gitViewerSidebar = "";
   sidebar.dataset.open = "false";
   sidebar.setAttribute("aria-hidden", "true");
+  applyClosedSidebarFallback(sidebar);
   app.append(sidebar);
   return sidebar;
+}
+
+function applyClosedSidebarFallback(sidebar) {
+  sidebar.style.position = "fixed";
+  sidebar.style.right = "0";
+  sidebar.style.transform = "translateX(100%)";
 }
 
 function ensurePanel(sidebar) {
